@@ -98,7 +98,7 @@ function getBracketEdits(line: vscode.TextLine, bracketDepth: number): vscode.Te
 			let newSpacePosition = new vscode.Position(line.range.start.line, openBracketIndex);
 			edits.push(vscode.TextEdit.insert(newSpacePosition, " "));
 		}
-		let extraSpacesIndex = text.search(/\s{2,}{\s*$/) + 1;
+		let extraSpacesIndex = text.search(/(?<=\S)\s{2,}{\s*$/) + 1;
 		if (extraSpacesIndex) {
 			let startDeletePositon = new vscode.Position(line.range.start.line, extraSpacesIndex);
 			let endDeletePosition = new vscode.Position(line.range.start.line, openBracketIndex);
