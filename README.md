@@ -17,9 +17,9 @@ Press `F5` to open a new window with the extension loaded.
 
 ## Features
 
-* Removes extra empty lines
-* Removes unnecessary white space
-* Indents items to match declaration block depth
+* Removes unnecessary empty lines
+* Removes unnecessary whitespace
+* Adjusts indents to match declaration block depth
 * Inserts lines between declaration blocks (if there is not one already)
 
 
