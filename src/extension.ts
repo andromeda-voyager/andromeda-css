@@ -1,71 +1,39 @@
 // The module 'vscode' contains the VS Code extensibility API
-// Import the module and reference it with the alias vscode in your code below
 import * as vscode from 'vscode';
 
-// this method is called when your extension is activated
-// your extension is activated the very first time the command is executed
+// this method is called when the extension is activated
 export function activate(context: vscode.ExtensionContext) {
 
 	vscode.languages.registerDocumentFormattingEditProvider('foo-css', {
 		provideDocumentFormattingEdits(document: vscode.TextDocument): vscode.TextEdit[] {
 			let bracketDepth = 0;
 			let edits: vscode.TextEdit[] = [];
-			let previousLine = document.lineAt(0);
-			let emptyLineCount = 0;
 			for (let i = 0; i < document.lineCount; i++) {
 				const line = document.lineAt(i);
-				// console.log("Line: " + (i + 1));
-				// console.log("text: \'" + line.text + "'");
+				console.log("Line: " + (i + 1));
+				console.log("text: \'" + line.text + "'");
 				if (line.isEmptyOrWhitespace) {
-					emptyLineCount++;
+					if (i < document.lineCount && i != 0) {
+						edits.push(vscode.TextEdit.delete(
+							new vscode.Range(document.lineAt(i).range.end, document.lineAt(i - 1).range.end)));
+					}
 				} else {
-					if (emptyLineCount > 0) {
-						// Sets the last non empty line to the first empty line if the documents starts out with one or more empty lines
-						let lastNonEmptyLine = (i - emptyLineCount - 1) > -1 ? (i - emptyLineCount - 1) : (i - emptyLineCount);
-
-						if (document.lineAt(lastNonEmptyLine).text.trim() === "}") {
-							previousLine = document.lineAt(i - emptyLineCount);
-							edits.push(vscode.TextEdit.replace(new vscode.Range(document.lineAt(i - emptyLineCount).range.start, document.lineAt(i - emptyLineCount + 1).range.start), "\n"));
-							edits.push(vscode.TextEdit.delete(new vscode.Range(document.lineAt(i - emptyLineCount + 1).range.start, line.range.start)));
-						} else {
-							edits.push(vscode.TextEdit.delete(new vscode.Range(document.lineAt(i - emptyLineCount).range.start, line.range.start)));
-							previousLine = document.lineAt(lastNonEmptyLine);
-						}
-						emptyLineCount = 0;
-
-					}
-
-					let leadWhitespaceEnd = new vscode.Position(line.range.start.line, line.text.search(/\S|$/));
-					let trailWhitespaceStart = new vscode.Position(line.range.start.line, line.text.search(/\s+$|$/));
-
-					if (previousLine.text.trim() === "}") {
-						edits.push(vscode.TextEdit.insert(line.range.start, '\n'));
-					}
-
-					if (line.text.trim() === "}") {
-						edits.push(vscode.TextEdit.replace(new vscode.Range(line.range.start, leadWhitespaceEnd), "  ".repeat(bracketDepth - 1)));
-					} else {
-						edits.push(vscode.TextEdit.replace(new vscode.Range(line.range.start, leadWhitespaceEnd), "  ".repeat(bracketDepth)));
-					}
-					edits.push(vscode.TextEdit.replace(new vscode.Range(trailWhitespaceStart, line.range.end), ""));
-
+					edits = edits.concat(getBracketEdits(line, bracketDepth));
+					edits = edits.concat(getIndentEdits(line, bracketDepth));
 					bracketDepth += depthAdjustment(line.text);
-					previousLine = line;
+					if (bracketDepth < 0) {
+						bracketDepth = 0;
+					}
 				}
 			}
 			return edits;
 		}
 	});
 
-	// Use the console to output diagnostic information (console.log) and errors (console.error)
-	// This line of code will only be executed once when your extension is activated
 	console.log('andromeda-css is now active!');
 
-	// The command has been defined in the package.json file
-	// Now provide the implementation of the command with registerCommand
-	// The commandId parameter must match the command field in package.json
+	// The command is defined in the package.json file
 	let disposable = vscode.commands.registerCommand('andromeda-css.helloWorld', () => {
-		// The code you place here will be executed every time your command is executed
 
 		// Display a message box to the user
 		vscode.window.showInformationMessage('Hello World from andromeda-css!');
@@ -74,8 +42,9 @@ export function activate(context: vscode.ExtensionContext) {
 	context.subscriptions.push(disposable);
 }
 
-// this method is called when your extension is deactivated
+// this method is called when the extension is deactivated
 export function deactivate() { }
+
 
 function depthAdjustment(line: string) {
 	let adjustment = 0;
@@ -84,4 +53,100 @@ function depthAdjustment(line: string) {
 		if (c === '}') adjustment--;
 	}
 	return adjustment;
+}
+
+function adjustBracketSpacing(text: string) {
+	let extraSpacesIndex = text.search(/\s{2,}{\s*$/);
+	if (extraSpacesIndex > -1) {
+		return text.substr(0, extraSpacesIndex + 1) + "{"
+	} else {
+		let spaceNeededIndex = text.search(/\S{\s*$/);
+		if (spaceNeededIndex > -1) {
+			return text.substr(0, text.length - 1) + " {"
+		}
+	}
+	return text;
+}
+
+function splitOnFirstBracket(text: string) {
+	let lines: string[] = [];
+	let splitIndex = text.search(/(?<=\S.*)}|(?<=\s*}).*|(?<=.*){/);
+	if (splitIndex > -1) {
+		splitIndex = text.charAt(splitIndex) === "{" ? splitIndex + 1 : splitIndex;
+		lines.push(text.substr(0, splitIndex));
+		let line2 = text.substr(splitIndex).trim();
+		if (line2.length > 0) {
+			lines.push(line2);
+		}
+	} else {
+		lines.push(text);
+	}
+	return lines;
+
+}
+
+function getBracketEdits(line: vscode.TextLine, bracketDepth: number): vscode.TextEdit[] {
+	let edits: vscode.TextEdit[] = [];
+
+	let lineAdjustedDepth = bracketDepth;
+	let lines = splitOnFirstBracket(line.text);
+	let text = lines[0];
+	let openBracketIndex = text.search(/{\s*$/);
+	if (openBracketIndex > -1) {
+		let spaceNeededIndex = text.search(/\S{\s*$/) + 1;
+		if (spaceNeededIndex) {
+			let newSpacePosition = new vscode.Position(line.range.start.line, openBracketIndex);
+			edits.push(vscode.TextEdit.insert(newSpacePosition, " "));
+		}
+		let extraSpacesIndex = text.search(/\s{2,}{\s*$/) + 1;
+		if (extraSpacesIndex) {
+			let startDeletePositon = new vscode.Position(line.range.start.line, extraSpacesIndex);
+			let endDeletePosition = new vscode.Position(line.range.start.line, openBracketIndex);
+			edits.push(vscode.TextEdit.delete(new vscode.Range(startDeletePositon, endDeletePosition)));
+		}
+	}
+	if (text.trim() === "}") {
+		edits.push(vscode.TextEdit.insert(line.range.end, "\n"));
+		lineAdjustedDepth = lineAdjustedDepth - 1 > 0 ? lineAdjustedDepth - 1 : 0;
+	}
+	if (lines.length > 1) {
+		if (lines[0].trim().charAt(lines[0].length - 1) === "{") {
+			lineAdjustedDepth++;
+		}
+		text = lines[1].trim();
+		let endDeletePosition = new vscode.Position(line.range.start.line, line.text.search(/\s+$|$/));
+		let startDeletePositon = new vscode.Position(line.range.start.line, lines[0].length);
+		edits.push(vscode.TextEdit.delete(new vscode.Range(startDeletePositon, endDeletePosition)));
+
+		while (text.length > 0) {
+			if (text.charAt(0) === "}") {
+				lineAdjustedDepth = lineAdjustedDepth - 1 > 0 ? lineAdjustedDepth - 1 : 0;
+				edits.push(vscode.TextEdit.insert(line.range.end, "\n".concat("  ".repeat(lineAdjustedDepth), "}")));
+				edits.push(vscode.TextEdit.insert(line.range.end, "\n"));
+				text = text.substr(1).trim();
+			} else { // '{.*'
+				lines = splitOnFirstBracket(text);
+				if (lines[0].includes('{')) {
+					lineAdjustedDepth++;
+				}
+				let newLine = adjustBracketSpacing(lines[0]);
+				edits.push(vscode.TextEdit.insert(line.range.end, "\n".concat("  ".repeat(lineAdjustedDepth), newLine)));
+				text = lines.length > 1 ? lines[1].trim() : "";
+			}
+		}
+	}
+	return edits;
+}
+
+function getIndentEdits(line: vscode.TextLine, bracketDepth: number): vscode.TextEdit[] {
+	let edits: vscode.TextEdit[] = [];
+	let leadWhitespaceEnd = new vscode.Position(line.range.start.line, line.text.search(/\S|$/));
+	let trailWhitespaceStart = new vscode.Position(line.range.start.line, line.text.search(/\s+$|$/));
+	if (line.text.trim().charAt(0) === "}" && bracketDepth > 0) {
+		edits.push(vscode.TextEdit.replace(new vscode.Range(line.range.start, leadWhitespaceEnd), "  ".repeat(bracketDepth - 1)));
+	} else {
+		edits.push(vscode.TextEdit.replace(new vscode.Range(line.range.start, leadWhitespaceEnd), "  ".repeat(bracketDepth)));
+	}
+	edits.push(vscode.TextEdit.replace(new vscode.Range(trailWhitespaceStart, line.range.end), ""));
+	return edits;
 }
