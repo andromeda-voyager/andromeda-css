@@ -1,14 +1,26 @@
 # andromeda-css README
-
 CSS Formatter
+
+## Install Dependencies
+`npm install`
+
+## Debug
+Press `F5` to open a new window with the extension loaded.
+
+## Package
+`npx vsce package`
+
+## Install
+
+`code --install-extension andromeda-css-0.0.1.vsix`
+
 
 ## Features
 
-Removes empty lines that are not preceded by a closing bracket.
-Removes trailing white space
-Removes leading white space that is not a part of the indent for declaration blocks
-Adjust the indent for items inside declaration blocks
-Inserts a new line (if there isn't one already) after a declaration block
+* Removes extra empty lines
+* Removes unnecessary white space
+* Indents items to match declaration block depth
+* Inserts lines between declaration blocks (if there is not one already)
 
 
 <!-- Describe specific features of your extension including screenshots of your extension in action. Image paths are relative to this README file.
